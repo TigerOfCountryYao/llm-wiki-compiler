@@ -1,5 +1,11 @@
 # llmwiki
 
+> **AutoCut compatibility build:** `@autocut-cli/llm-wiki-compiler@1.1.0-autocut.1`
+> is a temporary, exact-pinned build of upstream 1.1.0. It adds
+> `compile({ embeddings: false, systemPolicy })` and shared-source deletion
+> reconciliation for `@autocut-cli/llm-wiki`. The changes are being proposed
+> upstream; consumers should use the upstream package again once released.
+
 [![CI](https://img.shields.io/github/actions/workflow/status/atomicstrata/llm-wiki-compiler/ci.yml?branch=main&logo=github&label=CI)](https://github.com/atomicstrata/llm-wiki-compiler/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/llm-wiki-compiler?logo=npm&label=npm)](https://www.npmjs.com/package/llm-wiki-compiler)
 [![docs](https://img.shields.io/badge/docs-llmwiki.atomicstrata.ai-blue)](https://llmwiki.atomicstrata.ai)

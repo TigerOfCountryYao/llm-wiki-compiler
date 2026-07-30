@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0-autocut.1] - 2026-07-30
+
+Temporary AutoCut compatibility build of upstream 1.1.0.
+
+### Added
+
+- SDK callers can skip embedding refresh with `compile({ embeddings: false })`.
+- SDK callers can append a trusted `systemPolicy` without replacing built-in
+  compiler instructions.
+
+### Fixed
+
+- Deleting one source from a shared page now rebuilds from surviving sources
+  instead of retaining stale citations from the deleted source.
+
 ## [1.1.0] - 2026-07-15
 
 Adds a security-first template distribution ecosystem — publishers sign and distribute profile templates offline, and consumers discover, install, update, and verify them through explicitly trusted taps — plus a guided path for authoring a first profile and the `llmwiki status` command. Every addition is opt-in; projects that do not use templates, taps, or profiles are unaffected.
