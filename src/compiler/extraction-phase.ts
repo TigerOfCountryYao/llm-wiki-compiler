@@ -51,12 +51,13 @@ async function extractSourcesLimited(
   root: string,
   files: string[],
   limit: ReturnType<typeof pLimit>,
+  systemPolicy?: string,
 ): Promise<ExtractionResult[]> {
   let aborted = false;
   return Promise.all(files.map((file) => limit(async () => {
     if (aborted) throw new Error(`extraction skipped for ${file}: a prior source failed`);
     try {
-      return await extractForSource(root, file);
+      return await extractForSource(root, file, systemPolicy);
     } catch (err) {
       aborted = true;
       throw err;
@@ -65,11 +66,11 @@ async function extractSourcesLimited(
 }
 
 /**
- * Phase 1: extract concepts for the directly-changed batch, then expand to
- * any unchanged sources whose concepts overlap with newly extracted slugs.
- * Both batches share one `pLimit(concurrency)` cap; the late-affected set is
- * computed only after the whole direct batch resolves, since
- * findLateAffectedSources reads every direct extraction.
+ * Phase 1: extract concepts for the directly-changed batch, then repeatedly
+ * expand to unchanged sources whose concepts overlap newly extracted slugs.
+ * Every batch shares one `pLimit(concurrency)` cap. Discovery continues to a
+ * fixed point because a late owner's extraction can reveal another owner that
+ * was absent from its prior state entry.
  */
 export async function runExtractionPhases(
   root: string,
@@ -77,16 +78,25 @@ export async function runExtractionPhases(
   state: WikiState,
   allChanges: SourceChange[],
   concurrency: number,
+  systemPolicy?: string,
 ): Promise<ExtractionResult[]> {
   const limit = pLimit(concurrency);
-  const extractions = await extractSourcesLimited(root, toCompile.map((c) => c.file), limit);
+  const extractions = await extractSourcesLimited(
+    root, toCompile.map((c) => c.file), limit, systemPolicy,
+  );
 
-  const lateAffected = findLateAffectedSources(extractions, state, allChanges);
-  for (const file of lateAffected) {
-    output.status("~", output.info(`${file} [shares concept with new source]`));
+  while (true) {
+    const extracted = new Set(extractions.map((result) => result.sourceFile));
+    const lateAffected = findLateAffectedSources(
+      extractions, state, allChanges, extracted,
+    );
+    if (lateAffected.length === 0) break;
+    for (const file of lateAffected) {
+      output.status("~", output.info(`${file} [shares concept with new source]`));
+    }
+    const batch = await extractSourcesLimited(root, lateAffected, limit, systemPolicy);
+    extractions.push(...batch);
   }
-  const lateExtractions = await extractSourcesLimited(root, lateAffected, limit);
-  for (const result of lateExtractions) extractions.push(result);
 
   return extractions;
 }
@@ -98,6 +108,7 @@ export async function runExtractionPhases(
 async function extractForSource(
   root: string,
   sourceFile: string,
+  systemPolicy?: string,
 ): Promise<ExtractionResult> {
   output.status("*", output.info(`Extracting: ${sourceFile}`));
 
@@ -107,7 +118,7 @@ async function extractForSource(
   const chars = sourceContent.length;
   verbose(`source ${sourceFile}: ${lines} lines, ${chars} chars`);
   const existingIndex = await readConfinedExtractionIndex(root);
-  const concepts = await extractConcepts(sourceContent, existingIndex);
+  const concepts = await extractConcepts(sourceContent, existingIndex, systemPolicy);
 
   if (concepts.length > 0) {
     const names = concepts.map((c) => c.concept).join(", ");
@@ -141,13 +152,15 @@ async function readConfinedExtractionIndex(root: string): Promise<string> {
  * Call Claude to extract concepts from a source document.
  * @param sourceContent - Full source document text.
  * @param existingIndex - Current wiki index for deduplication.
+ * @param systemPolicy - Optional trusted caller policy added to the prompt.
  * @returns Parsed array of extracted concepts.
  */
 async function extractConcepts(
   sourceContent: string,
   existingIndex: string,
+  systemPolicy?: string,
 ): Promise<ExtractedConcept[]> {
-  const system = buildExtractionPrompt(sourceContent, existingIndex);
+  const system = buildExtractionPrompt(sourceContent, existingIndex, systemPolicy);
   const rawOutput = await callClaude({
     system,
     messages: [{ role: "user", content: "Extract the key concepts from this source." }],

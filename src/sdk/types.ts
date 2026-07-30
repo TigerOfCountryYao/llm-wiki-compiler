@@ -85,6 +85,16 @@ export interface SdkCompileOptions {
    * out-of-range values are clamped with a warning.
    */
   concurrency?: number;
+  /**
+   * Refresh semantic embeddings after compilation. Defaults to true.
+   * False prevents embedding-provider calls and pending-embedding retries.
+   */
+  embeddings?: boolean;
+  /**
+   * Trusted caller policy appended to both compile-time system prompts.
+   * The compiler's built-in extraction and page-writing instructions remain.
+   */
+  systemPolicy?: string;
 }
 
 /** Options for `getContextPack`. Maps onto the subset of BuildContextPackOptions needed externally. */

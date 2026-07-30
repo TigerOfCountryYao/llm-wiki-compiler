@@ -33,6 +33,7 @@ interface RenderableConcept {
   concept: ExtractedConcept;
   sourceFiles: string[];
   combinedContent: string;
+  rebuild?: boolean;
 }
 
 /**
@@ -41,12 +42,14 @@ interface RenderableConcept {
  * @param root - Project root directory.
  * @param entry - The merged concept to render.
  * @param schema - Resolved schema config, used to stamp `kind` on frontmatter.
+ * @param systemPolicy - Optional trusted caller policy added to the page prompt.
  * @returns Full markdown content (frontmatter + body, trailing newline).
  */
 export async function renderMergedPageContent(
   root: string,
   entry: RenderableConcept,
   schema: SchemaConfig,
+  systemPolicy?: string,
 ): Promise<string> {
   const existingPage = await readWikiPageContentOrWarn(
     root, CONCEPTS_DIR, entry.slug, false /* new page — absence is normal */,
@@ -56,8 +59,9 @@ export async function renderMergedPageContent(
   const system = buildPagePrompt(
     entry.concept.concept,
     entry.combinedContent,
-    existingPage,
+    entry.rebuild ? "" : existingPage,
     relatedPages,
+    systemPolicy,
   );
 
   const rawPageBody = await callClaude({
@@ -67,7 +71,12 @@ export async function renderMergedPageContent(
     ],
   });
 
-  const pageBody = normalizeCitationsInBody(rawPageBody, entry.sourceFiles, entry.combinedContent);
+  const pageBody = normalizeCitationsInBody(
+    rawPageBody,
+    entry.sourceFiles,
+    entry.combinedContent,
+    entry.rebuild === true,
+  );
 
   const frontmatter = buildMergedFrontmatter(entry, existingPage, schema);
   reportContradictionWarnings(entry.concept.concept, entry.concept);
